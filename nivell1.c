@@ -132,7 +132,7 @@ int check_internal(char **args) {
     if (!strcmp(args[0], "fg")) {
         return internal_fg(args);
     }
-    if (!strcmp(args[0], "cd")) {
+    if (!strcmp(args[0], "bg")) {
         return internal_bg(args);
     }
     if (!strcmp(args[0], "exit")) {
@@ -144,40 +144,41 @@ int check_internal(char **args) {
 //FUNCIONES PROVISIONALES
 int internal_cd(char **args) {
     
-        fprintf(stderr, GRIS_T "[internal_cd()-> Canvi de directori]\n");
+        fprintf(stderr, GRIS_T "[internal_cd()-> Canvi de directori]\n" RESET);
     
     return 1;
 }
 
 int internal_export(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_export()-> Assigna valors a variables d'entorn]\n");
+        fprintf(stderr, GRIS_T "[internal_export()-> Assigna valors a variables d'entorn]\n" RESET);
     
     return 1;
 }
 
 int internal_source(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_source()-> Executara caomandes fitxer]\n");
+        fprintf(stderr, GRIS_T "[internal_source()-> Executará fitxer en linies de comandes]\n" RESET);
     
     return 1;
 }
 
 int internal_jobs(char **args) {
-        fprintf(stderr, GRIS_T"[internal_jobs()-> PID processos no foreground]\n");
+        fprintf(stderr, GRIS_T "[internal_jobs()-> Mostrará PID dels processos que no estiguin al foreground]\n" RESET);
 
     return 1;
 }
 
 int internal_fg(char **args) {
     
-        fprintf(stderr, GRIS_T "[internal_fg()-> Envia de background a foreground o viceversa]\n");
+        fprintf(stderr, GRIS_T "[internal_fg()-> Envia de background a foreground o viceversa]\n" RESET);
     
     return 1;
 }
 
 int internal_bg(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_bg()-> Reactivara proces detingut en segón pla]\n");
+        fprintf(stderr, GRIS_T "[internal_bg()-> Reactivara proces detingut en segón pla]\n" RESET);
     
     return 1;
+}
