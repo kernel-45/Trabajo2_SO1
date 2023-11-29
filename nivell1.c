@@ -22,6 +22,20 @@ int internal_jobs(char **args);
 int internal_fg(char **args);
 int internal_bg(char **args);
 
+//Definició colors
+#define RESET "\033[0m"     //Posar els colors per defecte
+#define NEGRO_T "\x1b[30m"  //Text Negre
+#define NEGRO_F "\x1b[40m"  //Fons negre
+#define GRIS_T "\x1b[94m"   //La resta canvia el color del text per l'especificat per el nom
+#define ROJO_T "\x1b[31m"
+#define VERDE_T "\x1b[32m"
+#define AMARILLO_T "\x1b[33m"
+#define AZUL_T "\x1b[34m"
+#define MAGENTA_T "\x1b[35m"
+#define CYAN_T "\x1b[36m"
+#define BLANCO_T "\x1b[97m"
+#define NEGRITA "\x1b[1m"
+
 
 //Bucle infinit principal
 int main(){
@@ -84,17 +98,20 @@ int parse_args(char **args, char *line) {
     int token_count = 0;
 
     // Extreure el primer token
-    args[token_count] = strtok(line, "\t\n\r");
+    args[token_count] = strtok(line, " \t\n\r");
+    fprintf(stderr, GRIS_T "[parse_args()-> token %i: %s]\n" RESET, token_count, args[token_count]);
     //Bucle que extreu tots els tokens fins que arriba a null o a #
-    while (args[token_count] && args[token_count][0] != '#') {
+    while (args[token_count] && (args[token_count][0] != '#')) {
         token_count++;
         args[token_count] = strtok(NULL, " \t\n\r");
+        fprintf(stderr, GRIS_T "[parse_args()-> token %i: %s]\n" RESET, token_count, args[token_count]);
     }
 
     if (args[token_count]){
         //Si es troba un # deixa de trosejar pero no deixa l'ultim token com a null
         //Aqui el posem a null si l'ultim no ho es, si ja ho es no entra al if
         args[token_count] = NULL;
+        fprintf(stderr, GRIS_T "[parse_args()-> token %i corretgit: %s]\n" RESET, token_count, args[token_count]);
     }
     return token_count;
 }
@@ -126,46 +143,41 @@ int check_internal(char **args) {
 
 //FUNCIONES PROVISIONALES
 int internal_cd(char **args) {
-    #if nivel1 
-        fprintf(stderr, GRIS_T "[internal_cd()-> Esta función cambiará el directorio]\n");
-    #endif
+    
+        fprintf(stderr, GRIS_T "[internal_cd()-> Canvi de directori]\n");
+    
     return 1;
 }
 
 int internal_export(char **args) {
-    #if nivel1 
-        fprintf(stderr, GRIS_T "[internal_export()-> Esta función asignará valores a variables de entorno]\n");
-    #endif
+    
+        fprintf(stderr, GRIS_T"[internal_export()-> Assigna valors a variables d'entorn]\n");
+    
     return 1;
 }
 
 int internal_source(char **args) {
-    #if nivel1 
-        fprintf(stderr, GRIS_T "[internal_source()-> Esta función ejecutará un fichero de líneas de comandos]\n");
-    #endif
+    
+        fprintf(stderr, GRIS_T"[internal_source()-> Executara caomandes fitxer]\n");
+    
     return 1;
 }
 
 int internal_jobs(char **args) {
-    #if nivel1 
-        fprintf(stderr, GRIS_T "[internal_jobs()-> Esta función mostrará el PID de los procesos que no estén en foreground]\n");
-    #endif
+        fprintf(stderr, GRIS_T"[internal_jobs()-> PID processos no foreground]\n");
+
     return 1;
 }
 
 int internal_fg(char **args) {
-    #if nivel1 
-        fprintf(stderr, GRIS_T "[internal_fg()-> Esta función enviará un trabajo detenido al foreground reactivando su ejecución, o uno del background al foreground]\n");
-    #endif
+    
+        fprintf(stderr, GRIS_T "[internal_fg()-> Envia de background a foreground o viceversa]\n");
+    
     return 1;
 }
 
 int internal_bg(char **args) {
-    #if nivel1 
-        fprintf(stderr, GRIS_T "[internal_bg()-> Esta función reactivará un proceso detenido para que siga ejecutándose pero en segundo plano]\n");
-    #endif
+    
+        fprintf(stderr, GRIS_T"[internal_bg()-> Reactivara proces detingut en segón pla]\n");
+    
     return 1;
-}
-
-
-
