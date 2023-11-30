@@ -48,6 +48,7 @@ int main(){
     }
 
 }
+
 // Funció que ens imprimeix el directori on estem actualment del prompt
 void imprimir_prompt(){
     char *user = getenv("USER"); //Obtenim el USER
@@ -72,6 +73,7 @@ char *read_line(char *line) {
         return line;
         //Comprovar si l'usuari ha apretat Ctrl+D
     } else if (feof(stdin)) {
+        //HACER ALGO PARA QUE DIGA ADIÓS AL FINAL
         printf("\r\nAdiós!\n");
         exit(0);
         //Comprovar si hi ha hagut error al llegir la linea
@@ -151,20 +153,21 @@ int internal_cd(char **args) {
 
 int internal_export(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_export()-> Assigna valors a variables d'entorn]\n" RESET);
+        fprintf(stderr, GRIS_T "[internal_export()-> Assigna valors a variables d'entorn]\n" RESET);
     
     return 1;
 }
 
 int internal_source(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_source()-> Executara caomandes fitxer]\n") RESET;
+        fprintf(stderr, GRIS_T "[internal_source()-> Executara caomandes fitxer]\n") RESET;
     
     return 1;
 }
 
 int internal_jobs(char **args) {
-        fprintf(stderr, GRIS_T"[internal_jobs()-> PID processos no foreground]\n" RESET);
+
+        fprintf(stderr, GRIS_T "[internal_jobs()-> PID processos no foreground]\n" RESET);
 
     return 1;
 }
@@ -178,7 +181,7 @@ int internal_fg(char **args) {
 
 int internal_bg(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_bg()-> Reactivara proces detingut en segón pla]\n" RESET);
+        fprintf(stderr, GRIS_T "[internal_bg()-> Reactivara proces detingut en segón pla]\n" RESET);
     
     return 1;
 }
