@@ -138,6 +138,7 @@ int check_internal(char **args) {
         return internal_bg(args);
     }
     if (!strcmp(args[0], "exit")) {
+        printf("\rAdiós!\n");
         exit(0);
     }
     return 0;
@@ -160,14 +161,14 @@ int internal_export(char **args) {
 
 int internal_source(char **args) {
     
-        fprintf(stderr, GRIS_T "[internal_source()-> Executara caomandes fitxer]\n") RESET;
+        fprintf(stderr, GRIS_T "[internal_source()-> Executará fitxer en linies de comandes]\n" RESET);
     
     return 1;
 }
 
 int internal_jobs(char **args) {
 
-        fprintf(stderr, GRIS_T "[internal_jobs()-> PID processos no foreground]\n" RESET);
+        fprintf(stderr, GRIS_T "[internal_jobs()-> Mostrará PID dels processos que no estiguin al foreground]\n" RESET);
 
     return 1;
 }
