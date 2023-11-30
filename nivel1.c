@@ -3,7 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 
-hola
+
 
 #define PROMPT '$'
 #define MAX_COMAND_SIZE 1024  //llargada MAX de cada comanda
