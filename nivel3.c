@@ -221,7 +221,6 @@ int internal_fg(char **args) {
 int internal_bg(char **args) {
     
         fprintf(stderr, GRIS_T"[internal_bg()-> Reactivara proces detingut en segón pla]\n");
-    
     return 1;
 }
 
