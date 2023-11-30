@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <limits.h>
 
 
 
@@ -28,7 +27,7 @@ int internal_bg(char **args);
 #define RESET "\033[0m"     //Posar els colors per defecte
 #define NEGRO_T "\x1b[30m"  //Text Negre
 #define NEGRO_F "\x1b[40m"  //Fons negre
-#define GRIS_T "\x1b[37m"   //La resta canvia el color del text per l'especificat per el nom
+#define GRIS_T "\x1b[90m"   //La resta canvia el color del text per l'especificat per el nom
 #define ROJO_T "\x1b[31m"
 #define VERDE_T "\x1b[32m"
 #define AMARILLO_T "\x1b[33m"
@@ -37,7 +36,6 @@ int internal_bg(char **args);
 #define CYAN_T "\x1b[36m"
 #define BLANCO_T "\x1b[97m"
 #define NEGRITA "\x1b[1m"
-
 
 //Bucle infinit principal
 int main(){
@@ -50,14 +48,18 @@ int main(){
     }
 
 }
+
 // Funció que ens imprimeix el directori on estem actualment del prompt
 void imprimir_prompt(){
     char *user = getenv("USER"); //Obtenim el USER
     char *home = getenv("HOME"); //Obtenim el HOME
     char *pwd = getcwd(NULL, 0); //Obtenim el directori de treball actual
 
-    printf("%s:%s%s%s$ ", user, home, strstr(pwd, home) + strlen(home), strstr(pwd, home) + strlen(home) == pwd ? "" : "/");
-    
+    printf(CYAN_T "%s", user);
+    printf(RESET ":");
+    printf(AMARILLO_T "%s%s%s", home, strstr(pwd, home) + strlen(home), strstr(pwd, home) + strlen(home) == pwd ? "" : "/");
+    printf(RESET "$ ");
+
     free(pwd);  // Alliberar memoria assignada per getcwd
     fflush(stdout); //Ntetejem el buffer de sortida
     usleep(500000);  // Espera de 0.5 segons per poder imprimir altres missatges 
@@ -74,7 +76,8 @@ char *read_line(char *line) {
         return line;
         //Comprovar si l'usuari ha apretat Ctrl+D
     } else if (feof(stdin)) {
-        printf("\rAdiós!\n");
+        //HACER ALGO PARA QUE DIGA ADIÓS AL FINAL
+        printf("\r\nAdiós!\n");
         exit(0);
         //Comprovar si hi ha hagut error al llegir la linea
     } else {
@@ -101,19 +104,19 @@ int parse_args(char **args, char *line) {
 
     // Extreure el primer token
     args[token_count] = strtok(line, " \t\n\r");
-    //fprintf(stderr, GRIS_T "[parse_args()-> token %i: %s]\n" RESET, token_count, args[token_count]);
+    fprintf(stderr, GRIS_T "[parse_args()-> token %i: %s]\n" RESET, token_count, args[token_count]);
     //Bucle que extreu tots els tokens fins que arriba a null o a #
     while (args[token_count] && (args[token_count][0] != '#')) {
         token_count++;
         args[token_count] = strtok(NULL, " \t\n\r");
-        //fprintf(stderr, GRIS_T "[parse_args()-> token %i: %s]\n" RESET, token_count, args[token_count]);
+        fprintf(stderr, GRIS_T "[parse_args()-> token %i: %s]\n" RESET, token_count, args[token_count]);
     }
 
     if (args[token_count]){
         //Si es troba un # deixa de trosejar pero no deixa l'ultim token com a null
         //Aqui el posem a null si l'ultim no ho es, si ja ho es no entra al if
         args[token_count] = NULL;
-        //fprintf(stderr, GRIS_T "[parse_args()-> token %i corretgit: %s]\n" RESET, token_count, args[token_count]);
+        fprintf(stderr, GRIS_T "[parse_args()-> token %i corretgit: %s]\n" RESET, token_count, args[token_count]);
     }
     return token_count;
 }
@@ -134,10 +137,11 @@ int check_internal(char **args) {
     if (!strcmp(args[0], "fg")) {
         return internal_fg(args);
     }
-    if (!strcmp(args[0], "cd")) {
+    if (!strcmp(args[0], "bg")) {
         return internal_bg(args);
     }
     if (!strcmp(args[0], "exit")) {
+        printf("\rAdiós!\n");
         exit(0);
     }
     return 0;
@@ -156,14 +160,12 @@ int internal_cd(char **args) {
         chdir(args[1]);
     }
     
-
-    fprintf(stderr, GRIS_T "[internal_cd()-> Canvi de directori]\n");
+    fprintf(stderr, GRIS_T "[internal_cd()-> Canvi de directori]\n" RESET);
     
     return 1;
 }
 
 int internal_export(char **args) {
-           
     
     char *nom = strtok(args[1], "=");
 
@@ -184,7 +186,7 @@ int internal_export(char **args) {
 
     //Assignar canvi
     if (setenv(nom, valor, 1) != 0){
-        perror("Error al canviar la variable d'entorn");
+        perror(ROJO_T "Error al canviar la variable d'entorn" RESET);
         return 1;
     }
 
@@ -192,38 +194,33 @@ int internal_export(char **args) {
     char *nou = getenv(nom);
     fprintf(stderr, GRIS_T "Nou valor de %s: %s\n", nom, nou ? nou : "(no definido)" RESET);
 
-
-
-
     return 1;
 }
 
 int internal_source(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_source()-> Executara caomandes fitxer]\n");
+        fprintf(stderr, GRIS_T "[internal_source()-> Executará fitxer en linies de comandes]\n" RESET);
     
     return 1;
 }
 
 int internal_jobs(char **args) {
-        fprintf(stderr, GRIS_T"[internal_jobs()-> PID processos no foreground]\n");
+
+        fprintf(stderr, GRIS_T "[internal_jobs()-> Mostrará PID dels processos que no estiguin al foreground]\n" RESET);
 
     return 1;
 }
 
 int internal_fg(char **args) {
     
-        fprintf(stderr, GRIS_T "[internal_fg()-> Envia de background a foreground o viceversa]\n");
+        fprintf(stderr, GRIS_T "[internal_fg()-> Envia de background a foreground o viceversa]\n" RESET);
     
     return 1;
 }
 
 int internal_bg(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_bg()-> Reactivara proces detingut en segón pla]\n");
+        fprintf(stderr, GRIS_T "[internal_bg()-> Reactivara proces detingut en segón pla]\n" RESET);
     
     return 1;
 }
-
-
-
