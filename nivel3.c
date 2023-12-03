@@ -10,7 +10,7 @@
 #define ARGS_SIZE 64
 #define N_JOBS 10   //Numero de trabajos que almacena la tabla
 static char mi_shell[MAX_COMAND_SIZE]; //variable global para guardar el nombre del minishell
-
+char line[MAX_COMAND_SIZE]; //Array on guardem la comanda
 //Declaración struct jobs
 struct info_job {
    pid_t pid;
@@ -53,7 +53,6 @@ void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]);
 
 //Bucle infinit principal
 int main(int argc, char *argv[]){
-    char line[MAX_COMAND_SIZE]; //Array on guardem la comanda
     //Inicialización del primer job
         resetear_job(0);
     //Guardamos el nombre del programa
@@ -115,6 +114,7 @@ int execute_line(char *line) {
         pid_t pid = fork();
         int status;
         if (pid == 0){ // Proceso hijo
+        fprintf(stderr, GRIS_T "[execute_line()→ PID hijo: %d (%s)]\n" RESET, getpid(), jobs_list[0].cmd);
             if(execvp(args[0], args) == -1){
                 perror("Error ejecutando execvp"); // Imprime el mensaje de error según errno
                 printf("Código de error (errno): %d\n", errno); // Imprime el valor numérico de errno
@@ -122,9 +122,12 @@ int execute_line(char *line) {
         } else if (pid > 0){ // Proceso padre
             fprintf(stderr, GRIS_T "[execute_line()→ PID padre: %d (%s)]\n" RESET, getpid(), mi_shell);
             jobs_list_update(0, getpid(), 'E', line);
-        if (wait(&status) == -1)
-        {
+        if (wait(&status) == -1){
             perror("Error con wait()");
+        }
+
+         if (WIFEXITED(status)) {
+            printf("Proceso hijo terminado, código de salida %d\n", WEXITSTATUS(status));
         }
         resetear_job(0);
     }
@@ -236,8 +239,25 @@ int internal_export(char **args) {
 
 int internal_source(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_source()-> Executara caomandes fitxer]\n");
-    
+        fprintf(stderr, GRIS_T"[internal_source()-> Executara comandes fitxer]\n");
+        FILE *file;
+
+    if (!args[1]){
+        fprintf(stderr, ROJO_T "Error de sintaxis. Uso: source <nombre_fichero>\n" RESET);
+        return 0;
+    }
+    if (!(file = fopen(args[1], "r")))
+    {
+        fprintf(stderr, ROJO_T "Error al abrir el fichero\n" RESET);
+        return 0;
+    }
+    fflush(file);
+    while (fgets(line, MAX_COMAND_SIZE, file)){
+        line[strlen(line) - 1] = '\0';
+        fflush(file);
+        execute_line(line);
+    }
+    fclose(file);
     return 1;
 }
 
