@@ -4,12 +4,21 @@
 #include <unistd.h>
 #include <limits.h>
 
-
-
-
 #define PROMPT '$'
 #define MAX_COMAND_SIZE 1024  //llargada MAX de cada comanda
 #define ARGS_SIZE 64
+#define N_JOBS 10   //Numero de trabajos que almacena la tabla
+static char mi_shell[MAX_COMAND_SIZE]; //variable global para guardar el nombre del minishell
+
+//Declaración struct jobs
+struct info_job {
+   pid_t pid;
+   char estado; // ‘N’, ’E’, ‘D’, ‘F’ (‘N’: Ninguno, ‘E’: Ejecutándose y ‘D’: Detenido, ‘F’: Finalizado) 
+   char cmd[MAX_COMAND_SIZE]; // línea de comando asociada
+};
+
+//Declaración tabla jobs
+static struct info_job jobs_list [N_JOBS]; 
 
 //declaració funcions
 char *read_line(char *line);
@@ -23,6 +32,7 @@ int internal_source(char **args);
 int internal_jobs(char **args);
 int internal_fg(char **args);
 int internal_bg(char **args);
+void inicializar_job(); 
 
 //Definició colors
 #define RESET "\033[0m"     //Posar els colors per defecte
@@ -42,7 +52,8 @@ int internal_bg(char **args);
 //Bucle infinit principal
 int main(){
     char line[MAX_COMAND_SIZE]; //Array on guardem la comanda
-
+    //Inicialización del primer job
+    inicializar_job(); 
     while(1){
         if(read_line(line)){ //Llegim i verifiquem que estigui correcte
             execute_line(line); //executem 
@@ -56,7 +67,7 @@ void imprimir_prompt(){
     char *home = getenv("HOME"); //Obtenim el HOME
     char *pwd = getcwd(NULL, 0); //Obtenim el directori de treball actual
 
-    printf("%s:%s%s%s$ ", user, home, strstr(pwd, home) + strlen(home), strstr(pwd, home) + strlen(home) == pwd ? "" : "/");
+    printf(NEGRITA"%s:%s%s%s$ ", user, home, strstr(pwd, home) + strlen(home), strstr(pwd, home) + strlen(home) == pwd ? "" : "/");
     
     free(pwd);  // Alliberar memoria assignada per getcwd
     fflush(stdout); //Ntetejem el buffer de sortida
@@ -145,7 +156,6 @@ int check_internal(char **args) {
 
 //FUNCIONES PROVISIONALES
 int internal_cd(char **args) {
-    
     char path[PATH_MAX];
 
     //Si posen cd sense cap més argument va al home
@@ -224,5 +234,10 @@ int internal_bg(char **args) {
     return 1;
 }
 
+void inicializar_job(){
+    jobs_list[0].pid = 0; 
+    jobs_list[0].estado = 'N'; 
+    memset(jobs_list[0].cmd, '\0', MAX_COMAND_SIZE); 
+}
 
 

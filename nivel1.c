@@ -158,7 +158,7 @@ int internal_export(char **args) {
 
 int internal_source(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_source()-> Executara caomandes fitxer]\n") RESET;
+        fprintf(stderr, GRIS_T"[internal_source()-> Executara caomandes fitxer]\n" RESET);
     
     return 1;
 }
