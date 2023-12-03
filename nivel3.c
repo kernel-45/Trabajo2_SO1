@@ -33,7 +33,7 @@ int internal_source(char **args);
 int internal_jobs(char **args);
 int internal_fg(char **args);
 int internal_bg(char **args);
-void inicializar_job(); 
+void resetear_job(int idx); 
 void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]); 
 
 //Definició colors
@@ -55,7 +55,7 @@ void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]);
 int main(int argc, char *argv[]){
     char line[MAX_COMAND_SIZE]; //Array on guardem la comanda
     //Inicialización del primer job
-    inicializar_job(); 
+        resetear_job(0);
     //Guardamos el nombre del programa
         if (argc > 0) {
         strcpy(mi_shell, argv[0]); // Copia el contenido de argv[0] a mi_shell
@@ -121,12 +121,12 @@ int execute_line(char *line) {
             }
         } else if (pid > 0){ // Proceso padre
             fprintf(stderr, GRIS_T "[execute_line()→ PID padre: %d (%s)]\n" RESET, getpid(), mi_shell);
-            jobs_list_update(0, pid, 'E', line_inalterada);
+            jobs_list_update(0, getpid(), 'E', line);
         if (wait(&status) == -1)
         {
             perror("Error con wait()");
         }
-        jobs_list_reset(0);
+        resetear_job(0);
     }
     }
 
@@ -260,13 +260,15 @@ int internal_bg(char **args) {
     return 1;
 }
 
-void inicializar_job(){
-    jobs_list[0].pid = 0; 
-    jobs_list[0].estado = 'N'; 
-    memset(jobs_list[0].cmd, '\0', MAX_COMAND_SIZE); 
+void resetear_job(int idx){
+    jobs_list[idx].pid = 0; 
+    jobs_list[idx].estado = 'N'; 
+    memset(jobs_list[idx].cmd, '\0', MAX_COMAND_SIZE); 
 }
 
 void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]){
-    
+    jobs_list[numTabla].pid = pid; 
+    jobs_list[numTabla].estado = estado; 
+    strcpy(jobs_list[numTabla].cmd, cmd); 
 }
 
