@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <limits.h>
+#include <errno.h>
 
 #define PROMPT '$'
 #define MAX_COMAND_SIZE 1024  //llargada MAX de cada comanda
@@ -50,10 +51,17 @@ void inicializar_job();
 
 
 //Bucle infinit principal
-int main(){
+int main(int argc, char *argv[]){
     char line[MAX_COMAND_SIZE]; //Array on guardem la comanda
     //Inicialización del primer job
     inicializar_job(); 
+    //Guardamos el nombre del programa
+        if (argc > 0) {
+        strcpy(mi_shell, argv[0]); // Copia el contenido de argv[0] a mi_shell
+    } else {
+        printf(NEGRITA ROJO_T "Ha habido un error almacenando el nombre del programa.\n" RESET);
+    }
+
     while(1){
         if(read_line(line)){ //Llegim i verifiquem que estigui correcte
             execute_line(line); //executem 
@@ -102,6 +110,14 @@ int execute_line(char *line) {
         if (check_internal(args)) {
             return 1;
         }
+        //Si llega aquí es que no es un comando interno, creamos un hijo para ejecutar el comando
+        pid_t pid = fork();
+        int status;
+        if (pid == 0){ // Proceso hijo
+            if(execvp(args[0], args) == -1){
+
+            }
+        } 
     }
 
     return 0;
