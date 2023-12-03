@@ -34,6 +34,7 @@ int internal_jobs(char **args);
 int internal_fg(char **args);
 int internal_bg(char **args);
 void inicializar_job(); 
+void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]); 
 
 //Definició colors
 #define RESET "\033[0m"     //Posar els colors per defecte
@@ -115,9 +116,18 @@ int execute_line(char *line) {
         int status;
         if (pid == 0){ // Proceso hijo
             if(execvp(args[0], args) == -1){
-
+                perror("Error ejecutando execvp"); // Imprime el mensaje de error según errno
+                printf("Código de error (errno): %d\n", errno); // Imprime el valor numérico de errno
             }
-        } 
+        } else if (pid > 0){ // Proceso padre
+            fprintf(stderr, GRIS_T "[execute_line()→ PID padre: %d (%s)]\n" RESET, getpid(), mi_shell);
+            jobs_list_update(0, pid, 'E', line_inalterada);
+        if (wait(&status) == -1)
+        {
+            perror("Error con wait()");
+        }
+        jobs_list_reset(0);
+    }
     }
 
     return 0;
@@ -256,4 +266,7 @@ void inicializar_job(){
     memset(jobs_list[0].cmd, '\0', MAX_COMAND_SIZE); 
 }
 
+void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]){
+    
+}
 
