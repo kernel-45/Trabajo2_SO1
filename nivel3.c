@@ -196,7 +196,11 @@ int internal_cd(char **args) {
     if (args[1]==NULL){ //Si posen cd sense cap argument més, va al home
         chdir(getenv("HOME"));
     } else if ((args[1]!=NULL)&&(args[2]==NULL)){ //Si tiene un argumento en args[1] y no tiene argumentos en args[2]
-        chdir(args[1]);
+        if (chdir(args[1]) == -1) {
+            perror("chdir() error");
+        } else{
+            chdir(args[1]);
+        }
     } else if (args[2]!=NULL) {//Si tiene más de un argumento (cd avanzado)
         char buffer[1024];
 
@@ -225,7 +229,12 @@ int internal_cd(char **args) {
         if (len > 0 && buffer[len - 1] == ' ') {
             buffer[len - 1] = '\0';
         }
-        chdir(buffer);
+
+        if (chdir(buffer) == -1) {
+            perror("chdir() error");
+        } else{
+            chdir(buffer);
+        }
     }
     
     return 1;
