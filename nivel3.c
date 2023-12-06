@@ -41,7 +41,7 @@ void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]);
 #define RESET "\033[0m"     //Posar els colors per defecte
 #define NEGRO_T "\x1b[30m"  //Text Negre
 #define NEGRO_F "\x1b[40m"  //Fons negre
-#define GRIS_T "\x1b[37m"   //La resta canvia el color del text per l'especificat per el nom
+#define GRIS_T "\x1b[90m"   //La resta canvia el color del text per l'especificat per el nom
 #define ROJO_T "\x1b[31m"
 #define VERDE_T "\x1b[32m"
 #define AMARILLO_T "\x1b[33m"
