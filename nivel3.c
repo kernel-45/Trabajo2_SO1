@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 #define PROMPT '$'
 #define MAX_COMAND_SIZE 1024  //llargada MAX de cada comanda
@@ -50,7 +51,6 @@ void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]);
 #define BLANCO_T "\x1b[97m"
 #define NEGRITA "\x1b[1m"
 
-
 //Bucle infinit principal
 int main(int argc, char *argv[]){
     //Inicialización del primer job
@@ -69,14 +69,18 @@ int main(int argc, char *argv[]){
     }
 
 }
+
 // Funció que ens imprimeix el directori on estem actualment del prompt
 void imprimir_prompt(){
     char *user = getenv("USER"); //Obtenim el USER
     char *home = getenv("HOME"); //Obtenim el HOME
     char *pwd = getcwd(NULL, 0); //Obtenim el directori de treball actual
 
-    printf(NEGRITA"%s:%s%s%s$ ", user, home, strstr(pwd, home) + strlen(home), strstr(pwd, home) + strlen(home) == pwd ? "" : "/");
-    
+    printf(CYAN_T "%s", user);
+    printf(RESET ":");
+    printf(AMARILLO_T "%s%s%s", home, strstr(pwd, home) + strlen(home), strstr(pwd, home) + strlen(home) == pwd ? "" : "/");
+    printf(RESET "$ ");
+
     free(pwd);  // Alliberar memoria assignada per getcwd
     fflush(stdout); //Ntetejem el buffer de sortida
     usleep(500000);  // Espera de 0.5 segons per poder imprimir altres missatges 
@@ -93,7 +97,7 @@ char *read_line(char *line) {
         return line;
         //Comprovar si l'usuari ha apretat Ctrl+D
     } else if (feof(stdin)) {
-        printf("\rAdiós!\n");
+        printf("\r\nAdiós!\n");
         exit(0);
         //Comprovar si hi ha hagut error al llegir la linea
     } else {
@@ -122,15 +126,14 @@ int execute_line(char *line) {
         } else if (pid > 0){ // Proceso padre
             fprintf(stderr, GRIS_T "[execute_line()→ PID padre: %d (%s)]\n" RESET, getpid(), mi_shell);
             jobs_list_update(0, getpid(), 'E', line);
-        if (wait(&status) == -1){
-            perror("Error con wait()");
-        }
-
-         if (WIFEXITED(status)) {
-            printf("Proceso hijo terminado, código de salida %d\n", WEXITSTATUS(status));
-        }
+            if (wait(&status) == -1){
+                perror("Error con wait()");
+            }
+            if (WIFEXITED(status)) {
+                printf("Proceso hijo terminado, código de salida %d\n", WEXITSTATUS(status));
+            }
         resetear_job(0);
-    }
+        }
     }
 
     return 0;
@@ -174,10 +177,11 @@ int check_internal(char **args) {
     if (!strcmp(args[0], "fg")) {
         return internal_fg(args);
     }
-    if (!strcmp(args[0], "cd")) {
+    if (!strcmp(args[0], "bg")) {
         return internal_bg(args);
     }
     if (!strcmp(args[0], "exit")) {
+        printf("\rAdiós!\n");
         exit(0);
     }
     return 0;
@@ -185,27 +189,50 @@ int check_internal(char **args) {
 
 //FUNCIONES PROVISIONALES
 int internal_cd(char **args) {
-    char path[PATH_MAX];
-
-    //Si posen cd sense cap més argument va al home
-    if (args[1]==NULL){
-    //Posem args[1], ja que a args[0] tenim el cd
-        chdir(getenv("HOME"));
-    }else{
-        chdir(args[1]);
-    }
     
+    char *path[PATH_MAX];
 
-    fprintf(stderr, GRIS_T "[internal_cd()-> Canvi de directori]\n");
+    //Posem args[1], ja que a args[0] tenim el cd
+    if (args[1]==NULL){ //Si posen cd sense cap argument més, va al home
+        chdir(getenv("HOME"));
+    } else if ((args[1]!=NULL)&&(args[2]==NULL)){ //Si tiene un argumento en args[1] y no tiene argumentos en args[2]
+        chdir(args[1]);
+    } else if (args[2]!=NULL) {//Si tiene más de un argumento (cd avanzado)
+        char buffer[1024];
+
+        buffer[0] = '\0';  // Inicializar buffer como una cadena vacía
+
+        int i = 1;
+        while (args[i] != NULL) {
+            if (strchr(args[i], '\'') == NULL && strchr(args[i], '\"') == NULL && strchr(args[i], '\\') == NULL) {
+                // Si no tiene caracteres especiales copiamos el token en buffer
+                strcat(buffer, args[i]);
+            } else {
+                // Si tiene caracteres especiales copiamos el token en buffer sin el caracter especial
+                for (size_t k = 0; k < strlen(args[i]); k++) {
+                    if (args[i][k] != '\'' && args[i][k] != '\"' && args[i][k] != '\\') {
+                        strncat(buffer, &args[i][k], 1);
+                    }
+                }
+                //Añadimos un char espacio en buffer solo si cumple la condidión de tener caracter especial
+                strcat(buffer, " ");
+            }
+            i++;
+        }
+
+        // Eliminar el espacio extra al final del buffer
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len - 1] == ' ') {
+            buffer[len - 1] = '\0';
+        }
+        chdir(buffer);
+    }
     
     return 1;
 }
 
-int internal_export(char **args) {
-           
-    
+int internal_export(char **args) {    
     char *nom = strtok(args[1], "=");
-
     char *valor = strtok(NULL, "=");
 
     //Comprovar sintaxis
@@ -230,24 +257,19 @@ int internal_export(char **args) {
     //Mostrar nou valor
     char *nou = getenv(nom);
     fprintf(stderr, GRIS_T "Nou valor de %s: %s\n", nom, nou ? nou : "(no definido)" RESET);
-
-
-
-
+   
     return 1;
 }
 
 int internal_source(char **args) {
-    
-        fprintf(stderr, GRIS_T"[internal_source()-> Executara comandes fitxer]\n");
-        FILE *file;
+    fprintf(stderr, GRIS_T"[internal_source()-> Executara comandes fitxer]\n");
+    FILE *file;
 
     if (!args[1]){
         fprintf(stderr, ROJO_T "Error de sintaxis. Uso: source <nombre_fichero>\n" RESET);
         return 0;
     }
-    if (!(file = fopen(args[1], "r")))
-    {
+    if (!(file = fopen(args[1], "r"))){
         fprintf(stderr, ROJO_T "Error al abrir el fichero\n" RESET);
         return 0;
     }
@@ -262,21 +284,23 @@ int internal_source(char **args) {
 }
 
 int internal_jobs(char **args) {
-        fprintf(stderr, GRIS_T"[internal_jobs()-> PID processos no foreground]\n");
+
+        fprintf(stderr, GRIS_T "[internal_jobs()-> Mostrará PID dels processos que no estiguin al foreground]\n" RESET);
 
     return 1;
 }
 
 int internal_fg(char **args) {
     
-        fprintf(stderr, GRIS_T "[internal_fg()-> Envia de background a foreground o viceversa]\n");
+        fprintf(stderr, GRIS_T "[internal_fg()-> Envia de background a foreground o viceversa]\n" RESET);
     
     return 1;
 }
 
 int internal_bg(char **args) {
     
-        fprintf(stderr, GRIS_T"[internal_bg()-> Reactivara proces detingut en segón pla]\n");
+        fprintf(stderr, GRIS_T "[internal_bg()-> Reactivara proces detingut en segón pla]\n" RESET);
+    
     return 1;
 }
 
@@ -291,4 +315,3 @@ void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]){
     jobs_list[numTabla].estado = estado; 
     strcpy(jobs_list[numTabla].cmd, cmd); 
 }
-
