@@ -4,9 +4,6 @@
 #include <unistd.h>
 #include <limits.h>
 
-
-
-
 #define PROMPT '$'
 #define MAX_COMAND_SIZE 1024  //llargada MAX de cada comanda
 #define ARGS_SIZE 64
@@ -151,17 +148,43 @@ int check_internal(char **args) {
 //FUNCIONES PROVISIONALES
 int internal_cd(char **args) {
     
-    char path[PATH_MAX];
+    char *path[PATH_MAX];
 
-    //Si posen cd sense cap més argument va al home
-    if (args[1]==NULL){
     //Posem args[1], ja que a args[0] tenim el cd
+    if (args[1]==NULL){ //Si posen cd sense cap argument més, va al home
         chdir(getenv("HOME"));
-    }else{
+    } else if ((args[1]!=NULL)&&(args[2]==NULL)){ //Si tiene un argumento en args[1] y no tiene argumentos en args[2]
         chdir(args[1]);
+    } else if (args[2]!=NULL) {//Si tiene más de un argumento (cd avanzado)
+        char buffer[1024];
+
+        buffer[0] = '\0';  // Inicializar buffer como una cadena vacía
+
+        int i = 1;
+        while (args[i] != NULL) {
+            if (strchr(args[i], '\'') == NULL && strchr(args[i], '\"') == NULL && strchr(args[i], '\\') == NULL) {
+                // Si no tiene caracteres especiales copiamos el token en buffer
+                strcat(buffer, args[i]);
+            } else {
+                // Si tiene caracteres especiales copiamos el token en buffer sin el caracter especial
+                for (size_t k = 0; k < strlen(args[i]); k++) {
+                    if (args[i][k] != '\'' && args[i][k] != '\"' && args[i][k] != '\\') {
+                        strncat(buffer, &args[i][k], 1);
+                    }
+                }
+                //Añadimos un char espacio en buffer solo si cumple la condidión de tener caracter especial
+                strcat(buffer, " ");
+            }
+            i++;
+        }
+
+        // Eliminar el espacio extra al final del buffer
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len - 1] == ' ') {
+            buffer[len - 1] = '\0';
+        }
+        chdir(buffer);
     }
-    
-    fprintf(stderr, GRIS_T "[internal_cd()-> Canvi de directori]\n" RESET);
     
     return 1;
 }
