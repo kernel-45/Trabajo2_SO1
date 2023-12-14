@@ -208,17 +208,21 @@ int internal_cd(char **args) {
 
         int i = 1;
         while (args[i] != NULL) {
-            if (strchr(args[i], '\'') == NULL && strchr(args[i], '\"') == NULL && strchr(args[i], '\\') == NULL) {
+            if ((strchr(args[i], '\'') == NULL) && (strchr(args[i], '\"') == NULL) && (strchr(args[i], '\\') == NULL)) {
                 // Si no tiene caracteres especiales copiamos el token en buffer
                 strcat(buffer, args[i]);
             } else {
                 // Si tiene caracteres especiales copiamos el token en buffer sin el caracter especial
                 for (size_t k = 0; k < strlen(args[i]); k++) {
-                    if (args[i][k] != '\'' && args[i][k] != '\"' && args[i][k] != '\\') {
+                    if ((args[i][k] != '\'') && (args[i][k] != '\"') && (args[i][k] != '\\')) {
                         strncat(buffer, &args[i][k], 1);
                     }
                 }
-                //Añadimos un char espacio en buffer solo si cumple la condidión de tener caracter especial
+                printf("%s.", buffer);
+            }
+
+            //Añadimos un char espacio en buffer si hay otro token
+            if (args[i + 1] != NULL) {
                 strcat(buffer, " ");
             }
             i++;
