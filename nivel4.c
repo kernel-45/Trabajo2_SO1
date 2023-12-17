@@ -393,5 +393,4 @@ void ctrlc(int signum) {
     } else {
         printf("\nCtrl+C detectado. No hay proceso en foreground.\n");
     }
-    fflush(stdout);////ÚLTIMO AÑADIDO, ALOMEJOR LO ROMPE, NO OLVIDAR
 }
