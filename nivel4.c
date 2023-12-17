@@ -40,6 +40,8 @@ int internal_fg(char **args);
 int internal_bg(char **args);
 void resetear_job(int idx); 
 void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]); 
+void reaper(int signum);
+void ctrlc(int signum);
 
 //Definició colors
 #define RESET "\033[0m"     //Posar els colors per defecte
@@ -55,49 +57,15 @@ void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]);
 #define BLANCO_T "\x1b[97m"
 #define NEGRITA "\x1b[1m"
 
-void ctrlc(int signum) {
-    // Manejador para la señal SIGINT (Ctrl+C) en el padre
-    if (jobs_list[0].pid > 0) { // Hay un proceso en foreground
-        if (getpid() != jobs_list[0].pid) { // No es el propio mini shell
-            printf("\nCtrl+C detectado. Abortando proceso en primer plano...\n");
-
-            // Enviar señal SIGTERM al proceso en primer plano
-            kill(jobs_list[0].pid, SIGTERM);
-
-            // Notificar provisionalmente por pantalla
-            printf("Señal SIGTERM enviada a PID %d\n", jobs_list[0].pid);
-        } else {
-            printf("\nCtrl+C detectado. Abortar el mini shell o procesos en background con 'exit' o Ctrl+D.\n");
-        }
-    } else {
-        printf("\nCtrl+C detectado. No hay proceso en foreground.\n");
-    }
-
-    fflush(stdout);
-}
-
-void reaper(int signum) {
-    pid_t ended;
-    int status;
-
-    while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
-        printf("Proceso hijo terminado: PID %d", ended);
-
-        if (WIFEXITED(status)) {
-            printf(" con código de salida %d\n", WEXITSTATUS(status));
-        } else if (WIFSIGNALED(status)) {
-            printf(" terminado por la señal %d\n", WTERMSIG(status));
-        }
-
-        // Resetear jobs_list[0] si el hijo terminado es el que se ejecuta en primer plano
-        if (ended == jobs_list[0].pid) {
-            resetear_job(0);
-        }
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////Si tarda más de 1 segundo, puede hacer ctrl+C sin problemas, si pasa ese segundo, aborta el programa :D por algún motivo
 
 //Bucle infinit principal
 int main(int argc, char *argv[]){
+    //Llamada al enterrador de zombies cuando un hijo acaba (señal SIGCHLD)
+    signal(SIGCHLD, reaper);
+    //SIGINT es la señal de interrupción que produce Ctrl+C
+    signal(SIGINT, ctrlc);
+    
     //Inicialización del primer job
     resetear_job(0);
     //Guardamos el nombre del programa
@@ -107,21 +75,12 @@ int main(int argc, char *argv[]){
         printf(NEGRITA ROJO_T "Ha habido un error almacenando el nombre del programa.\n" RESET);
     }
 
-    //Llamada al enterrador de zombies cuando un hijo acaba (señal SIGCHLD)
-    signal(SIGCHLD, reaper);
-
-    //SIGINT es la señal de interrupción que produce Ctrl+C
-    signal(SIGINT, ctrlc);
-
     while(1){
         if(read_line(line)){ //Llegim i verifiquem que estigui correcte
             execute_line(line); //executem 
         }
     }
-
 }
-////////////////////////////////////////////////////////////////////////////////////////////////////Hasta que no pulsas almenos una vez ctrl+c no te deja hacer nada, sale de la ej en el segundo cntrl+c siempre y no deja hacer cntrl+D
-
 
 // Funció que ens imprimeix el directori on estem actualment del prompt
 void imprimir_prompt(){
@@ -136,7 +95,7 @@ void imprimir_prompt(){
 
     free(pwd);  // Alliberar memoria assignada per getcwd
     fflush(stdout); //Ntetejem el buffer de sortida
-    sleep(500000);  // Espera de 0.5 segons per poder imprimir altres missatges 
+    sleep(1);  // Espera de 1 segon per poder imprimir altres missatges 
 }
 
 char *read_line(char *line) {
@@ -152,7 +111,8 @@ char *read_line(char *line) {
     } else if (feof(stdin)) {
         printf("\r\nAdiós!\n");
         exit(0);
-    } else { //Comprovar si hi ha hagut error al llegir la linea
+        //Comprovar si hi ha hagut error al llegir la linea
+    } else {
         perror("Error al leer la línea");
         exit(EXIT_FAILURE);
     }
@@ -160,38 +120,48 @@ char *read_line(char *line) {
 
 int execute_line(char *line) {
     char *args[ARGS_SIZE];//Array on guardarem els tokens
+    char lineaBuffLoc[MAX_COMAND_SIZE];
+    strcpy(lineaBuffLoc, line);//Se copia la línea de comandes original al buffer local
 
     if (parse_args(args, line) > 0) {//Comprovem que haguem trobat almenys 1 token
         //comprovar si es una comanda interna
         if (check_internal(args)) {
             return 1;
         }
+
         //Si llega aquí es que no es un comando interno, creamos un hijo para ejecutar el comando
         pid_t pid = fork();
         int status;
 
         if (pid == 0){ // Proceso hijo
-            signal(SIGCHLD, SIG_DFL);  // Asociar la acción por defecto a SIGCHLD
-            signal(SIGINT, SIG_IGN);   // Ignóralo, ya se encargará el padre
+            // Establece el manejo de señales para el hijo
+            signal(SIGCHLD, SIG_DFL);  // Restaura el manejo por defecto de SIGCHLD
+            signal(SIGINT, SIG_IGN);    // Ignora la señal SIGINT para el hijo
 
-            fprintf(stderr, GRIS_T "[execute_line()→ PID hijo: %d (%s)]\n" RESET, getpid(), jobs_list[0].cmd);  //[execute_line()→ PID hijo: 17295 ()] Deberia salir (pwd)
-
-            if(execvp(args[0], args) == -1){
+            // Ejecutamos el comando en el proceso hijo usando execvp
+            if (execvp(args[0], args) == -1) {
                 perror("Error ejecutando execvp"); // Imprime el mensaje de error según errno
                 printf("Código de error (errno): %d\n", errno); // Imprime el valor numérico de errno
-                exit(-1);
+            }
+        } else if (pid > 0){ // Proceso padre
+            fprintf(stderr, GRIS_T "[execute_line()→ PID padre: %d (%s)]\n" RESET, pid, mi_shell);
+            // Actualizamos la información del trabajo en la estructura jobs
+            actualizar_job(0, pid, 'E', lineaBuffLoc);
+            
+            // Esperamos a que el proceso hijo termine y actualizamos la información del trabajo
+            pid_t hijo_terminado = waitpid(pid, &status, 0);
+
+            if (hijo_terminado == -1) {
+                perror("Error con waitpid()");
             }
 
-        } else if (pid > 0){ // Proceso padre
-            fprintf(stderr, GRIS_T "[execute_line()→ PID padre: %d (%s)]\n" RESET, getpid(), mi_shell);
+            // Comprobamos si el proceso hijo terminó normalmente
+            if (WIFEXITED(status)) {
+                printf("Proceso hijo terminado, código de salida %d\n", WEXITSTATUS(status));
+            }
 
-            // Configurar el manejador ctrlc
-            signal(SIGINT, ctrlc);
-            // Configurar el manejador reaper() para la señal SIGCHLD
-            signal(SIGCHLD, reaper);
-
-            // Esperar hasta que llegue alguna señal (SIGCHLD o SIGINT)
-            pause();
+            // Reseteamos la información del trabajo en la estructura trabajos
+            resetear_job(0);
         }
     }
 
@@ -389,4 +359,53 @@ void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]){
     jobs_list[numTabla].pid = pid; 
     jobs_list[numTabla].estado = estado; 
     strcpy(jobs_list[numTabla].cmd, cmd); 
+}
+
+void reaper(int signum) {
+    // Variables locales para almacenar el estado de terminación y el PID del proceso hijo que ha terminado
+    pid_t ended;
+    int status;
+
+    // Establece reaper como el manejador de la señal SIGCHLD
+    signal(SIGCHLD, reaper);
+
+    // Bucle para esperar y recolectar información sobre procesos hijos que han terminado
+    while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
+        printf("Proceso hijo terminado: PID %d", ended);
+
+        if (WIFEXITED(status)) {
+            printf(" con código de salida %d\n", WEXITSTATUS(status));
+        } else if (WIFSIGNALED(status)) {
+            printf(" terminado por la señal %d\n", WTERMSIG(status));
+        }
+
+        // Comprueba si el proceso hijo que ha terminado es el mismo que el proceso en primer plano
+        if (ended == jobs_list[0].pid) {
+            // Restablece el trabajo en primer plano (foreground) indicando que no hay trabajo en primer plano
+            resetear_job(0);
+        }
+    }
+}
+
+void ctrlc(int signum) {
+    // Establece ctrlc como el manejador de la señal SIGINT
+    signal(SIGINT, ctrlc);
+    // Manejador para la señal SIGINT (Ctrl+C) en el padre
+    if (jobs_list[0].pid > 0) { // Hay un proceso en foreground
+        // Verifica si el comando del proceso en primer plano no es el shell actual
+        if (strcmp(jobs_list[0].cmd, mi_shell) != 0) {
+            printf("\nCtrl+C detectado. Abortando proceso en primer plano...\n");
+
+            // Envia la señal SIGTERM al proceso en primer plano
+            kill(jobs_list[0].pid, SIGTERM);
+
+            // Notificar provisionalmente por pantalla
+            printf("Señal SIGTERM enviada a PID %d\n", jobs_list[0].pid);
+        } else {
+            printf("\nCtrl+C detectado. Abortar el mini shell o procesos en background con 'exit' o Ctrl+D.\n");
+        }
+    } else {
+        printf("\nCtrl+C detectado. No hay proceso en foreground.\n");
+    }
+    fflush(stdout);////ÚLTIMO AÑADIDO, ALOMEJOR LO ROMPE, NO OLVIDAR
 }
