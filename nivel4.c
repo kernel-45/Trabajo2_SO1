@@ -57,8 +57,6 @@ void ctrlc(int signum);
 #define BLANCO_T "\x1b[97m"
 #define NEGRITA "\x1b[1m"
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////Si tarda más de 1 segundo, puede hacer ctrl+C sin problemas, si pasa ese segundo, aborta el programa :D por algún motivo
-
 //Bucle infinit principal
 int main(int argc, char *argv[]){
     //Llamada al enterrador de zombies cuando un hijo acaba (señal SIGCHLD)
@@ -112,9 +110,6 @@ char *read_line(char *line) {
         printf("\r\nAdiós!\n");
         exit(0);
         //Comprovar si hi ha hagut error al llegir la linea
-    } else {
-        perror("Error al leer la línea");
-        exit(EXIT_FAILURE);
     }
 }
 
@@ -131,7 +126,6 @@ int execute_line(char *line) {
 
         //Si llega aquí es que no es un comando interno, creamos un hijo para ejecutar el comando
         pid_t pid = fork();
-        int status;
 
         if (pid == 0){ // Proceso hijo
             // Establece el manejo de señales para el hijo
@@ -147,17 +141,9 @@ int execute_line(char *line) {
             fprintf(stderr, GRIS_T "[execute_line()→ PID padre: %d (%s)]\n" RESET, pid, mi_shell);
             // Actualizamos la información del trabajo en la estructura jobs
             actualizar_job(0, pid, 'E', lineaBuffLoc);
-            
-            // Esperamos a que el proceso hijo termine y actualizamos la información del trabajo
-            pid_t hijo_terminado = waitpid(pid, &status, 0);
 
-            if (hijo_terminado == -1) {
-                perror("Error con waitpid()");
-            }
-
-            // Comprobamos si el proceso hijo terminó normalmente
-            if (WIFEXITED(status)) {
-                printf("Proceso hijo terminado, código de salida %d\n", WEXITSTATUS(status));
+            while (jobs_list[0].pid > 0) {
+                pause();
             }
 
             // Reseteamos la información del trabajo en la estructura trabajos
