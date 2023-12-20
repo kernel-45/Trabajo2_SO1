@@ -9,13 +9,14 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #define PROMPT '$'
 #define MAX_COMAND_SIZE 1024  //llargada MAX de cada comanda
 #define ARGS_SIZE 64
 #define MAX_JOBS 10   //Numero de trabajos MAX que almacena la tabla
 static char mi_shell[MAX_COMAND_SIZE]; //variable global para guardar el nombre del minishell
-int n_jobs = 0;
+int n_job = 0;
 char line[MAX_COMAND_SIZE]; //Array on guardem la comanda
 //Declaración struct jobs
 struct info_job {
@@ -43,8 +44,12 @@ void resetear_job(int idx);
 void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]); 
 void reaper(int signum);
 void ctrlc(int signum);
+void ctrlz(int signum);
 int is_background(char **args);
-int job_list_add(pid_t pid, char estado, char *cmd);
+int jobs_list_add(pid_t pid, char estado, char *cmd);
+int jobs_list_find(pid_t pid);
+int jobs_list_remove(int pos);
+int internal_jobs();
 
 //Definició colors
 #define RESET "\033[0m"     //Posar els colors per defecte
@@ -66,6 +71,8 @@ int main(int argc, char *argv[]){
     signal(SIGCHLD, reaper);
     //SIGINT es la señal de interrupción que produce Ctrl+C
     signal(SIGINT, ctrlc);
+    //SIGTSPT es la señal de interrupción que produce Ctrl+Z
+    signal(SIGTSTP, ctrlz);
     
     //Inicialización del primer job
     resetear_job(0);
@@ -127,8 +134,7 @@ int execute_line(char *line) {
             return 1;
         }
 
-        int aux = is_background(args); //Comprova si la comanda porta &.
-
+        bool bckgnd = is_background(args); //Comprova si la comanda porta &.  //Si tiene '&' retorna 1(True), si no tiene, retorna 0(False)
 
         //Si llega aquí es que no es un comando interno, creamos un hijo para ejecutar el comando
         pid_t pid = fork();
@@ -140,22 +146,29 @@ int execute_line(char *line) {
             signal(SIGTSTP, SIG_IGN);   //Ignora la senyal SIGTSTP per el fill
 
             // Ejecutamos el comando en el proceso hijo usando execvp
-            if (execvp(args[0], args) == -1) {
+            if (execvp(args[0], args)) {
                 perror("Error ejecutando execvp"); // Imprime el mensaje de error según errno
                 printf("Código de error (errno): %d\n", errno); // Imprime el valor numérico de errno
+                exit(error("Error no encontrado"));
             }
         } else if (pid > 0){ // Proceso padre
             fprintf(stderr, GRIS_T "[execute_line()→ PID padre: %d (%s)]\n" RESET, pid, mi_shell);
-            // Actualizamos la información del trabajo en la estructura jobs
-            actualizar_job(0, pid, 'E', lineaBuffLoc);
+            fprintf(stderr, GRIS_T "[execute_line()→ PID hijo: %d (%s)]\n" RESET, pid, lineaBuffLoc); //Temporal//////////////////////////////
 
+            //Verifica si debe ejecutarse en segundo plano
+            if (!bckgnd){ //Si NO es segundo plano
+                //Actualizamos la información del trabajo en la estructura jobs
+                actualizar_job(0, pid, 'E', lineaBuffLoc);
 
-            while (jobs_list[0].pid > 0) {
-                pause();
+                while (jobs_list[0].pid > 0) {
+                    pause();
+                }
+
+                // Reseteamos la información del trabajo en la estructura trabajos
+                //resetear_job(0);                                                           ///////Puede que esto tenga que ir en los dos
+            } else{ //Si es segundo plano
+                jobs_list_add(pid, 'E', lineaBuffLoc);
             }
-
-            // Reseteamos la información del trabajo en la estructura trabajos
-            resetear_job(0);
         }
     }
 
@@ -322,13 +335,6 @@ int internal_source(char **args) {
     return 1;
 }
 
-int internal_jobs(char **args) {
-
-        fprintf(stderr, GRIS_T "[internal_jobs()-> Mostrará PID dels processos que no estiguin al foreground]\n" RESET);
-
-    return 1;
-}
-
 int internal_fg(char **args) {
     
         fprintf(stderr, GRIS_T "[internal_fg()-> Envia de background a foreground o viceversa]\n" RESET);
@@ -395,7 +401,7 @@ void ctrlc(int signum) {
     signal(SIGINT, ctrlc);
     // Manejador para la señal SIGINT (Ctrl+C) en el padre
     if (jobs_list[0].pid > 0) { // Hay un proceso en foreground
-        // Verifica si el comando del proceso en primer plano no es el shell actual
+        // Verifica si el comando del proceso en primer plano no es el mini shell actual
         if (strcmp(jobs_list[0].cmd, mi_shell) != 0) {
             printf("\nCtrl+C detectado. Abortando proceso en primer plano...\n");
 
@@ -412,7 +418,33 @@ void ctrlc(int signum) {
     }
 }
 
-int is_background(char **args){
+void ctrlz(int signum){
+    // Establece ctrlz como el manejador de la señal SIGTSTP
+    signal(SIGTSTP, ctrlz);
+
+    if (jobs_list[0].pid > 0) { // Hay un proceso en foreground
+        // Verifica si el comando del proceso en primer plano no es el mini shell actual
+        if (strcmp(jobs_list[0].cmd, mi_shell) != 0) {
+            //Enviarle la señal SIGSTOP y provisionalmente notificarlo por pantalla
+            kill(jobs_list[0].pid, SIGSTOP);
+
+            //Cambiar el estado del proceso a ‘D’ (detenido)
+            jobs_list[0].estado = 'D';
+
+            //Utilizar  jobs_list_add() para incorporar el proceso a la tabla jobs_list[ ] por el final
+            jobs_list_add(jobs_list[0].pid, jobs_list[0].estado, jobs_list[0].cmd);
+
+            //Resetear los datos de jobs_list[0] ya que el proceso ha dejado de ejecutarse en foreground
+            resetear_job(0);
+        } else{
+            printf("Señal SIGSTOP no enviada debido a que el proceso en foreground es el shell\n");
+        }
+    } else{
+        printf("Señal SIGSTOP no enviada debido a que no hay proceso en foreground\n");
+    }
+}
+
+int is_background(char **args){ //Detecta si localiza el token '&' en algún args[]
     int i = 0;
     while(args[i]){
         if (strcmp(args[i], "&")==0){
@@ -424,23 +456,27 @@ int is_background(char **args){
     return 0;
 }
 
-int job_list_add(pid_t pid, char estado, char *cmd){
+int jobs_list_add(pid_t pid, char estado, char *cmd){
 
-    if (n_jobs < MAX_JOBS-1){ //comprovem que la llista no estigui plena
-        jobs_list[n_jobs + 1].pid = pid;//afegim el valor pid a la primera posició buida de jobs_list
-		strcpy(jobs_list[n_jobs + 1].cmd, cmd);//copiem la cadena de caracters cmd al jobs_list
-		jobs_list[n_jobs + 1].status = status;//afegim l'estat corresponent al job_list
-		n_jobs++;//augmentem per tal de que apunti al ultim job
+    if (n_job < MAX_JOBS-1){ //comprovem que la llista no estigui plena
+        jobs_list[n_job + 1].pid = pid;//afegim el valor pid a la primera posició buida de jobs_list
+		strcpy(jobs_list[n_job + 1].cmd, cmd);//copiem la cadena de caracters cmd al jobs_list
+		jobs_list[n_job + 1].estado = estado;//afegim l'estat corresponent al job_list
+        
+        printf("[%d]\t%d\t%c\t%s\n", n_job + 1, jobs_list[n_job + 1].pid, jobs_list[n_job + 1].estado, jobs_list[n_job + 1].cmd);
+		
+        n_job++;//augmentem per tal de que apunti al ultim job
+
 
 		return 0;
     }
-
     return -1;
+
 }
 
 int jobs_list_find(pid_t pid) {
 
-    for (int i = 0; i < MAX_JOBS; ++i) {//for que recorre l'array de jobs
+    for (int i = 1; i <= n_job; ++i) {//for que recorre l'array de jobs
         if (jobs_list[i].pid == pid) {//si troba el job que se li passa per parametre retorna la posició on es troba dins l'array
             return i; 
         }
@@ -449,29 +485,29 @@ int jobs_list_find(pid_t pid) {
 }
 
 int jobs_list_remove(int pos) {
-    if (pos < 0 || pos >= n_jobs) {
+    if (pos < 0 || pos >= n_job) {
         // Posició invàlida
         return -1;
     }
    
     // Moure l'ultim job de la llista a la posició del job eliminat
-    jobs_list[pos] = jobs_list[n_jobs - 1];
+    jobs_list[pos] = jobs_list[n_job - 1];
 
     // Netejar la ultima posició d'haber-la mogut
-    memset(&jobs_list[n_jobs - 1], 0, sizeof(struct info_job));
+    memset(&jobs_list[n_job - 1], 0, sizeof(struct info_job));
 
     // Decrementar el contador de jobs
-    n_jobs--;
+    n_job--;
 
     return 0; 
 }
 
-int internal_jobs() { //La intenció es que la impresió surti de manera similar al shell
+int internal_jobs(char **args) { //La intenció es que la impresió surti de manera similar al shell
     printf("ID\tPID\tEstado\tComando\n"); 
-    for (int i = 0; i < n_jobs; i++) {
+    for (int i = 1; i <= n_job; i++) {
         if (jobs_list[i].pid != 0) { // Comprovar que el job està actiu
             printf("[%d]\t%d\t%c\t%s\n", 
-                   i + 1, // Identificador de cada job començant per 1
+                   i, // Identificador de cada job començant per 1
                    jobs_list[i].pid, // PID del job
                    jobs_list[i].estado, // Estado del job (D o E)
                    jobs_list[i].cmd); // Comanda
@@ -479,4 +515,3 @@ int internal_jobs() { //La intenció es que la impresió surti de manera similar
     }
     return 0;
 }
-
