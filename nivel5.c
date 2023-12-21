@@ -37,10 +37,10 @@ int check_internal(char **args);
 int internal_cd(char **args);
 int internal_export(char **args);
 int internal_source(char **args);
-int internal_jobs(char **args);
+int internal_jobs();
 int internal_fg(char **args);
 int internal_bg(char **args);
-void resetear_job(int idx); 
+void resetear_job(int idx, char estado);
 void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]); 
 void reaper(int signum);
 void ctrlc(int signum);
@@ -49,7 +49,6 @@ int is_background(char **args);
 int jobs_list_add(pid_t pid, char estado, char *cmd);
 int jobs_list_find(pid_t pid);
 int jobs_list_remove(int pos);
-int internal_jobs(char **args); 
 
 //Definició colors
 #define RESET "\033[0m"     //Posar els colors per defecte
@@ -74,8 +73,8 @@ int main(int argc, char *argv[]){
     //SIGTSPT es la señal de interrupción que produce Ctrl+Z
     signal(SIGTSTP, ctrlz);
     
-    //Inicialización del primer job
-    resetear_job(0);
+    //Iniciamos el primer job
+    resetear_job(0, 'N');
     //Guardamos el nombre del programa
     if (argc > 0) {
         strcpy(mi_shell, argv[0]); // Copia el contenido de argv[0] a mi_shell
@@ -103,7 +102,6 @@ void imprimir_prompt(){
 
     free(pwd);  // Alliberar memoria assignada per getcwd
     fflush(stdout); //Ntetejem el buffer de sortida
-    sleep(1);  // Espera de 1 segon per poder imprimir altres missatges 
 }
 
 char *read_line(char *line) {
@@ -149,11 +147,10 @@ int execute_line(char *line) {
             if (execvp(args[0], args)) {
                 perror("Error ejecutando execvp"); // Imprime el mensaje de error según errno
                 printf("Código de error (errno): %d\n", errno); // Imprime el valor numérico de errno
-                exit(EXIT_FAILURE);
             }
         } else if (pid > 0){ // Proceso padre
             fprintf(stderr, GRIS_T "[execute_line()→ PID padre: %d (%s)]\n" RESET, pid, mi_shell);
-            fprintf(stderr, GRIS_T "[execute_line()→ PID hijo: %d (%s)]\n" RESET, pid, lineaBuffLoc); //Temporal//////////////////////////////
+            fprintf(stderr, GRIS_T "[execute_line()→ PID hijo: %d (%s)]\n" RESET, pid, lineaBuffLoc);
 
             //Verifica si debe ejecutarse en segundo plano
             if (!bckgnd){ //Si NO es segundo plano
@@ -163,9 +160,6 @@ int execute_line(char *line) {
                 while (jobs_list[0].pid > 0) {
                     pause();
                 }
-
-                // Reseteamos la información del trabajo en la estructura trabajos
-                //resetear_job(0);                                                           ///////Puede que esto tenga que ir en los dos
             } else{ //Si es segundo plano
                 jobs_list_add(pid, 'E', lineaBuffLoc);
             }
@@ -208,7 +202,7 @@ int check_internal(char **args) {
         return internal_source(args);
     }
     if (!strcmp(args[0], "jobs")) {
-        return internal_jobs(args);
+        return internal_jobs();
     }
     if (!strcmp(args[0], "fg")) {
         return internal_fg(args);
@@ -349,9 +343,9 @@ int internal_bg(char **args) {
     return 1;
 }
 
-void resetear_job(int idx){
+void resetear_job(int idx, char estado){
     jobs_list[idx].pid = 0; 
-    jobs_list[idx].estado = 'N'; 
+    jobs_list[idx].estado = estado; 
     memset(jobs_list[idx].cmd, '\0', MAX_COMAND_SIZE); 
 }
 
@@ -364,32 +358,31 @@ void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]){
 void reaper(int signum) {
     // Variables locales para almacenar el estado de terminación y el PID del proceso hijo que ha terminado
     pid_t ended;
-    int status;
+    int estado;
 
     // Establece reaper como el manejador de la señal SIGCHLD
     signal(SIGCHLD, reaper);
 
     // Bucle para esperar y recolectar información sobre procesos hijos que han terminado
-    while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
+    while ((ended = waitpid(-1, &estado, WNOHANG)) > 0) {
         printf("Proceso hijo terminado: PID %d", ended);
 
-        if (WIFEXITED(status)) {
-            printf(" con código de salida %d\n", WEXITSTATUS(status));
-        } else if (WIFSIGNALED(status)) {
-            printf(" terminado por la señal %d\n", WTERMSIG(status));
+        if (WIFEXITED(estado)) {
+            printf(" con código de salida %d\n", WEXITSTATUS(estado));
+        } else if (WIFSIGNALED(estado)) {
+            printf(" terminado por la señal %d\n", WTERMSIG(estado));
         }
 
         // Comprueba si el proceso hijo que ha terminado es el mismo que el proceso en primer plano
         if (ended == jobs_list[0].pid) {
             // Restablece el trabajo en primer plano (foreground) indicando que no hay trabajo en primer plano
-            resetear_job(0);
+            resetear_job(0, 'F');
         }else{
             // Proces en background ha finalitzat
             int pos = jobs_list_find(ended); // Buscar el PID en jobs_list
-            if (pos != -1) {
+            if (pos > 0) {
                 printf("Proceso en background finalizado: PID=%d, Comando=%s\n",
                        jobs_list[pos].pid, jobs_list[pos].cmd);
-
                 jobs_list_remove(pos);
             }
         }
@@ -435,7 +428,7 @@ void ctrlz(int signum){
             jobs_list_add(jobs_list[0].pid, jobs_list[0].estado, jobs_list[0].cmd);
 
             //Resetear los datos de jobs_list[0] ya que el proceso ha dejado de ejecutarse en foreground
-            resetear_job(0);
+            resetear_job(0, 'N');
         } else{
             printf("Señal SIGSTOP no enviada debido a que el proceso en foreground es el shell\n");
         }
@@ -485,33 +478,37 @@ int jobs_list_find(pid_t pid) {
 }
 
 int jobs_list_remove(int pos) {
-    if (pos < 0 || pos >= n_job) {
+    if (pos > n_job) {
         // Posició invàlida
-        return -1;
+        return 0;
     }
-   
-    // Moure l'ultim job de la llista a la posició del job eliminat
-    jobs_list[pos] = jobs_list[n_job - 1];
+    
+    if(pos < n_job){
+        // Moure l'ultim job de la llista a la posició del job eliminat
+        jobs_list[pos] = jobs_list[n_job];
 
-    // Netejar la ultima posició d'haber-la mogut
-    memset(&jobs_list[n_job - 1], 0, sizeof(struct info_job));
+        // Decrementar el contador de jobs
+        n_job--;
+    } else{
+        // Decrementar el contador de jobs
+        n_job--;
+    }
 
-    // Decrementar el contador de jobs
-    n_job--;
-
-    return 0; 
+    return 1; 
 }
 
-int internal_jobs(char **args) { //La intenció es que la impresió surti de manera similar al shell
-    printf("ID\tPID\tEstado\tComando\n"); 
-    for (int i = 1; i <= n_job; i++) {
-        if (jobs_list[i].pid != 0) { // Comprovar que el job està actiu
-            printf("[%d]\t%d\t%c\t%s\n", 
-                   i, // Identificador de cada job començant per 1
-                   jobs_list[i].pid, // PID del job
-                   jobs_list[i].estado, // Estado del job (D o E)
-                   jobs_list[i].cmd); // Comanda
+int internal_jobs() { //La intenció es que la impresió surti de manera similar al shell
+    if (n_job != 0){
+        printf("ID\tPID\tEstado\tComando\n"); 
+        for (int i = 1; i <= n_job; i++) {
+            if (jobs_list[i].pid != 0) { // Comprovar que el job està actiu
+                printf("[%d]\t%d\t%c\t%s\n", 
+                    i, // Identificador de cada job començant per 1
+                    jobs_list[i].pid, // PID del job
+                    jobs_list[i].estado, // Estado del job (D o E)
+                    jobs_list[i].cmd); // Comanda
+            }
         }
     }
-    return 0;
+    return 1;
 }
