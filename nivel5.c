@@ -49,7 +49,7 @@ int is_background(char **args);
 int jobs_list_add(pid_t pid, char estado, char *cmd);
 int jobs_list_find(pid_t pid);
 int jobs_list_remove(int pos);
-int internal_jobs();
+int internal_jobs(char **args); 
 
 //Definició colors
 #define RESET "\033[0m"     //Posar els colors per defecte
@@ -149,7 +149,7 @@ int execute_line(char *line) {
             if (execvp(args[0], args)) {
                 perror("Error ejecutando execvp"); // Imprime el mensaje de error según errno
                 printf("Código de error (errno): %d\n", errno); // Imprime el valor numérico de errno
-                exit(error("Error no encontrado"));
+                exit(EXIT_FAILURE);
             }
         } else if (pid > 0){ // Proceso padre
             fprintf(stderr, GRIS_T "[execute_line()→ PID padre: %d (%s)]\n" RESET, pid, mi_shell);

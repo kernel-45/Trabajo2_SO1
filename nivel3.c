@@ -35,7 +35,7 @@ int internal_jobs(char **args);
 int internal_fg(char **args);
 int internal_bg(char **args);
 void resetear_job(int idx); 
-void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]); 
+void jobs_list_update(int numTabla, pid_t pid, char estado, char cmd[]); 
 
 //Definició colors
 #define RESET "\033[0m"     //Posar els colors per defecte
@@ -323,7 +323,7 @@ void resetear_job(int idx){
     memset(jobs_list[idx].cmd, '\0', MAX_COMAND_SIZE); 
 }
 
-void actualizar_job(int numTabla, pid_t pid, char estado, char cmd[]){
+void jobs_list_update(int numTabla, pid_t pid, char estado, char cmd[]){
     jobs_list[numTabla].pid = pid; 
     jobs_list[numTabla].estado = estado; 
     strcpy(jobs_list[numTabla].cmd, cmd); 
