@@ -23,11 +23,11 @@ nivel2: nivel2.o
 nivel3: nivel3.o
 	$(CC) $@.o -o $@ $(LIBRARIES)
 	
-#nivel4: nivel4.o
-#	$(CC) $@.o -o $@ $(LIBRARIES)
+nivel4: nivel4.o
+	$(CC) $@.o -o $@ $(LIBRARIES)
 
-#nivel5: nivel5.o
-#	$(CC) $@.o -o $@ $(LIBRARIES)
+nivel5: nivel5.o
+	$(CC) $@.o -o $@ $(LIBRARIES)
 
 #nivel6: nivel6.o
 #	$(CC) $@.o -o $@ $(LIBRARIES)
